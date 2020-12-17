@@ -1,6 +1,13 @@
 name: Continuous Integration
 
-on: [pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - 3.4.x
+      - 3.3.x
+      - 3.2.x
 
 jobs:
   ci:
@@ -31,6 +38,23 @@ jobs:
         run: sbt ++${{ matrix.scala }} test
       - name: Binary compatibility
         run: sbt ++${{ matrix.scala }} mimaReportBinaryIssues
+      # Publishing steps
+      # These steps are here to avoid duplicated work and logic
+      - name: Setup GPG (for Publish)
+        id: publish_start
+        # on.push.branches above enforces we only publish from correct branches
+        # TODO Uncomment below line before merging
+        # if: github.event_name == 'push'
+        uses: olafurpg/setup-gpg@v3
+      - name: Publish
+        # publish_start if guards this step
+        if: steps.publish_start.outcome != 'skipped'
+        run: sbt ci-release
+        env:
+          PGP_PASSPHRASE: ${{ secrets.PGP_PASSPHRASE }}
+          PGP_SECRET: ${{ secrets.PGP_SECRET }}
+          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
 
 
   # Sentinel job to simplify how we specify which checks need to pass in branch
